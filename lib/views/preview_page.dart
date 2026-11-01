@@ -38,7 +38,6 @@ class _PreviewPageState extends State<PreviewPage> {
   }
 
   Future<void> _loadExistingContactsAndValidate() async {
-    setState(() => _isLoading = true);
     try {
       final cache = await _service.fetchExistingContacts();
       _existingPhones = cache.phones;
