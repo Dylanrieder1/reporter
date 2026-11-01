@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>通讯录导入助手</title>
+  <!-- Material 风格与 SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --primary: #1976D2;
+      --primary-light: #E3F2FD;
+      --surface: #FFFFFF;
+      --background: #F8F9FA;
+      --text: #1F2937;
+      --text-muted: #6B7280;
+      --border: #E5E7EB;
+      --success: #10B981;
+      --warning: #F59E0B;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--background);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* 顶部导航 */
+    header {
+      background-color: var(--primary);
+      color: white;
+      padding: 16px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: 600;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    /* 标签页导航 */
+    .tabs {
+      display: flex;
+      background: white;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 14px;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-muted);
+      border: none;
+      background: none;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .tab-btn.active::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 15%;
+      width: 70%;
+      height: 3px;
+      background-color: var(--primary);
+      border-radius: 2px;
+    }
+
+    /* 主体容器 */
+    .container {
+      flex: 1;
+      padding: 16px;
+      max-width: 600px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* 卡片与按钮 */
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      border: 1px solid var(--border);
+    }
+
+    .upload-box {
+      border: 2px dashed #93C5FD;
+      background: var(--primary-light);
+      border-radius: 12px;
+      padding: 32px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .upload-box:active {
+      background: #DBEAFE;
+    }
+
+    .upload-icon {
+      font-size: 40px;
+      margin-bottom: 8px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 160px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      resize: vertical;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: var(--primary);
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 14px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 12px;
+      box-shadow: 0 2px 4px rgba(25, 118, 210, 0.2);
+    }
+
+    .btn:disabled {
+      background: #D1D5DB;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      background: #E5E7EB;
+      color: var(--text);
+      box-shadow: none;
+    }
+
+    /* 开关配置项 */
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+    }
+
+    .switch-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .switch-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 26px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #D1D5DB;
+      transition: .3s;
+      border-radius: 26px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--primary);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+
+    /* 统计与核对列表 */
+    .stat-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .stat-pill {
+      flex: 1;
+      padding: 8px;
+      background: #F3F4F6;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-pill.success {
+      background: #ECFDF5;
+      color: #065F46;
+    }
+
+    .stat-pill.warning {
+      background: #FFFBEB;
+      color: #92400E;
+    }
+
+    .stat-number {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .contact-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #F3F4F6;
+    }
+
+    .contact-avatar {
+      width: 40px;
+      height: 40px;
+      background: var(--primary-light);
+      color: var(--primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      margin-right: 12px;
+      flex-shrink: 0;
+    }
+
+    .contact-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .contact-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .contact-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .tag {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .tag-success {
+      background: #ECFDF5;
+      color: #059669;
+    }
+
+    .tag-skip {
+      background: #FEF3C7;
+      color: #D97706;
+    }
+
+    /* 底部固定导入栏 */
+    .bottom-bar {
+      position: sticky;
+      bottom: 0;
+      background: white;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      box-shadow: 0 -2px 6px rgba(0,0,0,0.05);
+    }
+  </style>
+</head>
+<body>
+
+  <header>📱 通讯录一键导入助手</header>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab(0)">Excel / CSV 导入</button>
+    <button class="tab-btn" onclick="switchTab(1)">剪贴板文本粘贴</button>
+  </div>
+
+  <div class="container">
+    <!-- TAB 1: 表格上传 -->
+    <div id="tab-file" class="tab-content active">
+      <div class="card">
+        <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+          <div class="upload-icon">📂</div>
+          <div id="fileTitle" style="font-size: 16px; font-weight: 600;">点击选择 Excel (.xlsx/.xls) 或 CSV 文件</div>
+          <div id="fileDesc" style="font-size: 13px; color: var(--text-muted); margin-top: 6px;">支持任意列顺序，自动智能推断表头</div>
+          <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleFile(this)">
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: 剪贴板文本粘贴 -->
+    <div id="tab-text" class="tab-content">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-weight: 600; font-size: 14px;">粘贴通讯录名单：</span>
+          <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px; border-radius: 4px; border:none;" onclick="clearText()">清空</button>
+        </div>
+        <textarea id="pasteInput" placeholder="在此粘贴微信/钉钉/通知文本，例如：&#10;张三 13800000001 研发部 架构师&#10;李四, 13800000002, 市场中心, 总监&#10;王五 13800000003" oninput="handleTextChange()"></textarea>
+      </div>
+    </div>
+
+    <!-- 配置面板 -->
+    <div class="card">
+      <div class="switch-row">
+        <div>
+          <div class="switch-title">来电显示优化</div>
+          <div class="switch-desc">姓名后自动附加部门与职位（如：张三-研发部-架构师）</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="appendOpt" checked onchange="recomputePreview()">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- 预览与核对区域 -->
+    <div id="previewCard" class="card" style="display: none;">
+      <div style="font-weight: 600; margin-bottom: 12px;">待导入核对与预览</div>
+      <div class="stat-bar">
+        <div class="stat-pill">
+          <div class="stat-number" id="statTotal">0</div>
+          <div class="stat-label">总计解析</div>
+        </div>
+        <div class="stat-pill success">
+          <div class="stat-number" id="statValid" style="color: #059669;">0</div>
+          <div class="stat-label">就绪导入</div>
+        </div>
+        <div class="stat-pill warning">
+          <div class="stat-number" id="statSkipped" style="color: #D97706;">0</div>
+          <div class="stat-label">自动跳过</div>
+        </div>
+      </div>
+
+      <div id="contactList" style="max-height: 280px; overflow-y: auto;">
+        <!-- 联系人列表项 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部导入栏 -->
+  <div id="bottomBar" class="bottom-bar" style="display: none;">
+    <button class="btn" id="importBtn" onclick="exportAndImportVCF()">
+      📥 一键导入到手机系统通讯录
+    </button>
+    <div style="font-size: 11px; text-align: center; color: var(--text-muted); margin-top: 6px;">
+      点击后手机系统通讯录将自动弹出，轻触“确定”即可瞬间全部入库
+    </div>
+  </div>
+
+  <script>
+    let rawContacts = [];
+    let validItems = [];
+
+    function switchTab(index) {
+      const tabs = document.querySelectorAll('.tab-btn');
+      const contents = document.querySelectorAll('.tab-content');
+      tabs.forEach((t, i) => t.classList.toggle('active', i === index));
+      contents.forEach((c, i) => c.classList.toggle('active', i === index));
+    }
+
+    // 智能切分手机号正则与关键词
+    const phoneRegex = /(?:(?:\+|00)?86[\s\-]?)?1[3-9]\d[\s\-]?\d{4}[\s\-]?\d{4}/;
+    const deptRegex = /部|科|组|中心|院|所|室|局|处|行|馆|团队|部门|分公司|支行|team|dept/i;
+    const titleRegex = /经理|总监|工程师|专员|主管|顾问|架构师|助理|会计|HR|开发|设计|运营|测试|运维|组长|主任|书记|部长|负责人|总管|CEO|CTO|COO|CFO|VP|合伙人|实习生|专家|研究员/i;
+
+    function cleanPhone(raw) {
+      let p = raw.replace(/\D/g, '');
+      if (p.startsWith('86') && p.length === 13) p = p.substring(2);
+      return p;
+    }
+
+    function parseSingleLine(line) {
+      // 过滤注释
+      const cIdx = line.search(/#|\/\//);
+      if (cIdx !== -1) line = line.substring(0, cIdx).trim();
+      if (!line) return null;
+
+      const match = line.match(phoneRegex);
+      if (!match) return null;
+
+      const rawPhone = match[0];
+      const phone = cleanPhone(rawPhone);
+      const remaining = line.replace(rawPhone, ' ').trim();
+      const tokens = remaining.split(/[\t,，;；|/ ]+/)
+                              .map(t => t.replace(/^[#*:\-—]+|[#*:\-—]+$/g, '').trim())
+                              .filter(t => t.length > 0);
+
+      let name = '', department = '', title = '';
+      const unassigned = [];
+
+      for (const t of tokens) {
+        if (!department && deptRegex.test(t)) {
+          department = t;
+        } else if (!title && titleRegex.test(t)) {
+          title = t;
+        } else {
+          unassigned.push(t);
+        }
+      }
+
+      if (unassigned.length > 0) name = unassigned.shift();
+      if (!department && unassigned.length > 0) department = unassigned.shift();
+      if (!title && unassigned.length > 0) title = unassigned.shift();
+
+      return { name, phone, department, title };
+    }
+
+    // 剪贴板文本变更
+    function handleTextChange() {
+      const text = document.getElementById('pasteInput').value;
+      const lines = text.split(/\r?\n/);
+      rawContacts = [];
+
+      for (const l of lines) {
+        const item = parseSingleLine(l.trim());
+        if (item) rawContacts.push(item);
+      }
+      recomputePreview();
+    }
+
+    function clearText() {
+      document.getElementById('pasteInput').value = '';
+      rawContacts = [];
+      recomputePreview();
+    }
+
+    // 文件上传解析 (支持 .xlsx, .xls, .csv)
+    function handleFile(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      document.getElementById('fileTitle').innerText = '已选择: ' + file.name;
+      document.getElementById('fileDesc').innerText = '正在解析表格内容...';
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+          if (jsonRows.length < 2) {
+            alert('表格内容为空或行数过少');
+            return;
+          }
+
+          const headers = jsonRows[0].map(h => String(h || '').trim());
+          const mapping = detectMapping(headers);
+
+          rawContacts = [];
+          for (let i = 1; i < jsonRows.length; i++) {
+            const row = jsonRows[i];
+            if (!row || row.length === 0) continue;
+
+            const name = String(row[mapping.name] || '').trim();
+            const phone = cleanPhone(String(row[mapping.phone] || '').trim());
+            const department = mapping.dept >= 0 ? String(row[mapping.dept] || '').trim() : '';
+            const title = mapping.title >= 0 ? String(row[mapping.title] || '').trim() : '';
+
+            if (name || phone) {
+              rawContacts.push({ name, phone, department, title });
+            }
+          }
+
+          document.getElementById('fileDesc').innerText = `解析出 ${rawContacts.length} 行数据，已智能匹配列`;
+          recomputePreview();
+        } catch (err) {
+          alert('解析失败: ' + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function detectMapping(headers) {
+      let name = 0, phone = 1, dept = 2, title = 3;
+      headers.forEach((h, idx) => {
+        const lower = h.toLowerCase();
+        if (/姓名|名字|员工|联系人|name/.test(lower)) name = idx;
+        else if (/手机|电话|小号|号码|phone|mobile/.test(lower)) phone = idx;
+        else if (/部门|科室|机构|单位|dept|team/.test(lower)) dept = idx;
+        else if (/职位|职务|岗位|职称|title|post/.test(lower)) title = idx;
+      });
+      return { name, phone, dept, title };
+    }
+
+    // 重新计算并呈现核对列表与严格跳过
+    function recomputePreview() {
+      const appendOpt = document.getElementById('appendOpt').checked;
+      const previewCard = document.getElementById('previewCard');
+      const bottomBar = document.getElementById('bottomBar');
+      const listContainer = document.getElementById('contactList');
+
+      if (rawContacts.length === 0) {
+        previewCard.style.display = 'none';
+        bottomBar.style.display = 'none';
+        return;
+      }
+
+      previewCard.style.display = 'block';
+      bottomBar.style.display = 'block';
+
+      validItems = [];
+      const seenPhones = new Set();
+      const seenNames = new Set();
+      let skippedCount = 0;
+
+      listContainer.innerHTML = '';
+
+      rawContacts.forEach(item => {
+        const parts = [item.name];
+        if (appendOpt) {
+          if (item.department) parts.push(item.department);
+          if (item.title) parts.push(item.title);
+        }
+        const displayName = parts.join('-');
+
+        let status = 'valid';
+        let reason = '就绪';
+
+        if (!item.name) {
+          status = 'skip';
+          reason = '姓名缺失';
+        } else if (!/^1[3-9]\d{9}$/.test(item.phone)) {
+          status = 'skip';
+          reason = '号码异常';
+        } else if (seenPhones.has(item.phone)) {
+          status = 'skip';
+          reason = '号码重复';
+        } else if (seenNames.has(item.name)) {
+          status = 'skip';
+          reason = '同名跳过';
+        }
+
+        if (status === 'valid') {
+          seenPhones.add(item.phone);
+          seenNames.add(item.name);
+          validItems.push({ ...item, displayName });
+        } else {
+          skippedCount++;
+        }
+
+        // 渲染列表项
+        const div = document.createElement('div');
+        div.className = 'contact-item';
+        div.innerHTML = `
+          <div class="contact-avatar" style="${status === 'skip' ? 'background:#F3F4F6;color:#9CA3AF;' : ''}">
+            ${item.name ? item.name.charAt(0) : '?'}
+          </div>
+          <div class="contact-info">
+            <div class="contact-name" style="${status === 'skip' ? 'text-decoration:line-through;color:#9CA3AF;' : ''}">
+              ${displayName}
+            </div>
+            <div class="contact-sub">
+              ${item.phone} ${item.department ? '· ' + item.department : ''} ${item.title ? '· ' + item.title : ''}
+            </div>
+          </div>
+          <span class="tag ${status === 'valid' ? 'tag-success' : 'tag-skip'}">${reason}</span>
+        `;
+        listContainer.appendChild(div);
+      });
+
+      document.getElementById('statTotal').innerText = rawContacts.length;
+      document.getElementById('statValid').innerText = validItems.length;
+      document.getElementById('statSkipped').innerText = skippedCount;
+      document.getElementById('importBtn').innerText = `📥 一键导入到手机系统通讯录 (${validItems.length} 条)`;
+      document.getElementById('importBtn').disabled = validItems.length === 0;
+    }
+
+    // 核心导出并触发手机原生通讯录导入 (.vcf vCard 3.0)
+    function exportAndImportVCF() {
+      if (validItems.length === 0) return;
+
+      let vcf = '';
+      validItems.forEach(c => {
+        vcf += 'BEGIN:VCARD\r\n';
+        vcf += 'VERSION:3.0\r\n';
+        vcf += `FN;CHARSET=UTF-8:${c.displayName}\r\n`;
+        vcf += `N;CHARSET=UTF-8:;${c.displayName};;;\r\n`;
+        vcf += `TEL;TYPE=CELL:${c.phone}\r\n`;
+        if (c.department) {
+          vcf += `ORG;CHARSET=UTF-8:${c.department}\r\n`;
+        }
+        if (c.title) {
+          vcf += `TITLE;CHARSET=UTF-8:${c.title}\r\n`;
+        }
+        vcf += 'END:VCARD\r\n';
+      });
+
+      const blob = new Blob([vcf], { type: 'text/vcard;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `导入通讯录_${new Date().toISOString().slice(0,10)}.vcf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
