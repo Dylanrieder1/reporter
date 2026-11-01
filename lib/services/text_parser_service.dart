@@ -40,7 +40,15 @@ class TextParserService {
   }
 
   /// 单行解析逻辑
-  static RawContactData? _parseSingleLine(String line) {
+  static RawContactData? _parseSingleLine(String rawLine) {
+    // 0. 去除行尾注释（如 # 或 // 及其后内容）
+    String line = rawLine;
+    final commentMatch = RegExp(r'(?:#|//).*$').firstMatch(line);
+    if (commentMatch != null) {
+      line = line.substring(0, commentMatch.start).trim();
+    }
+    if (line.isEmpty) return null;
+
     // 1. 查找手机号
     final match = _phoneRegex.firstMatch(line);
     if (match == null) {
@@ -62,7 +70,7 @@ class TextParserService {
     // 3. 按照常见分隔符（制表符、逗号、中英文分号、竖线、连续空格）切分
     final rawTokens = remainingText
         .split(RegExp(r'[\t,，;；|/ ]+'))
-        .map((e) => e.trim())
+        .map((e) => e.replaceAll(RegExp(r'^[#*:\-—]+|[#*:\-—]+$'), '').trim())
         .where((e) => e.isNotEmpty)
         .toList();
 
