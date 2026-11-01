@@ -49,7 +49,7 @@ jobs:
                   with open(manifest_path, "w", encoding="utf-8") as f:
                       f.write(content)
 
-          # 2. 统一 compileSdk 为 36，解决 Android 15/16 AAR 依赖版本校验
+          # 2. 统一主模块 compileSdk 为 36
           app_gradle = "android/app/build.gradle.kts"
           if os.path.exists(app_gradle):
               with open(app_gradle, "r", encoding="utf-8") as f:
@@ -58,11 +58,33 @@ jobs:
               with open(app_gradle, "w", encoding="utf-8") as f:
                   f.write(c)
 
-          # 3. 在根 build.gradle.kts 中禁用严格的 AarMetadata 检查
+          # 3. 在 gradle.properties 中添加 suppress 标识
+          prop_path = "android/gradle.properties"
+          if os.path.exists(prop_path):
+              with open(prop_path, "a", encoding="utf-8") as f:
+                  f.write("\nandroid.suppressUnsupportedCompileSdk=36\n")
+
+          # 4. 在根 build.gradle.kts 中为所有子模块统一升级 compileSdk 为 36
           root_gradle = "android/build.gradle.kts"
+          sub_code = """
+subprojects {
+    afterEvaluate {
+        val ext = project.extensions.findByName("android")
+        if (ext != null) {
+            try {
+                ext.javaClass.getMethod("compileSdkVersion", Int::class.javaPrimitiveType).invoke(ext, 36)
+            } catch (_: Throwable) {
+                try {
+                    ext.javaClass.getMethod("setCompileSdkVersion", Int::class.javaPrimitiveType).invoke(ext, 36)
+                } catch (_: Throwable) {}
+            }
+        }
+    }
+}
+"""
           if os.path.exists(root_gradle):
               with open(root_gradle, "a", encoding="utf-8") as f:
-                  f.write("\nsubprojects {\n    tasks.matching { it.name.contains(\"AarMetadata\") }.configureEach {\n        enabled = false\n    }\n}\n")
+                  f.write("\n" + sub_code + "\n")
           '
 
       - name: Install dependencies
