@@ -20,16 +20,6 @@ class ContactsImporterApp extends StatelessWidget {
           seedColor: const Color(0xFF1976D2),
           brightness: Brightness.light,
         ),
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-        ),
-        cardTheme: CardTheme(
-          elevation: 1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
       ),
       home: const HomePage(),
     );
