@@ -19,7 +19,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -30,6 +30,20 @@ jobs:
         with:
           channel: 'stable'
           cache: true
+
+      - name: Complete Android native scaffold
+        run: |
+          flutter create --platforms=android --org com.example .
+          python3 -c '
+          path = "android/app/src/main/AndroidManifest.xml"
+          with open(path, "r", encoding="utf-8") as f:
+              content = f.read()
+          perms = "    <uses-permission android:name=\"android.permission.READ_CONTACTS\" />\n    <uses-permission android:name=\"android.permission.WRITE_CONTACTS\" />\n"
+          if "READ_CONTACTS" not in content:
+              content = content.replace("<application", perms + "    <application")
+              with open(path, "w", encoding="utf-8") as f:
+                  f.write(content)
+          '
 
       - name: Install dependencies
         run: flutter pub get
