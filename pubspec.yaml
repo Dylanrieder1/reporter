@@ -1,0 +1,25 @@
+name: contacts_importer
+description: "A Flutter Android app for bulk importing secondary phone numbers, department, name, and title into system contacts."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_contacts: ^1.1.9+2
+  permission_handler: ^11.3.1
+  file_picker: ^8.1.7
+  excel: ^4.0.6
+  csv: ^6.0.0
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  test: ^1.25.8
+
+flutter:
+  uses-material-design: true
