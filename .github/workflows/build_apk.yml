@@ -31,17 +31,18 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Complete Android native scaffold
+      - name: Generate pristine modern Android scaffold
         run: |
+          rm -rf android
           flutter create --platforms=android --org com.example .
           python3 -c '
-          path = "android/app/src/main/AndroidManifest.xml"
-          with open(path, "r", encoding="utf-8") as f:
+          manifest_path = "android/app/src/main/AndroidManifest.xml"
+          with open(manifest_path, "r", encoding="utf-8") as f:
               content = f.read()
           perms = "    <uses-permission android:name=\"android.permission.READ_CONTACTS\" />\n    <uses-permission android:name=\"android.permission.WRITE_CONTACTS\" />\n"
           if "READ_CONTACTS" not in content:
               content = content.replace("<application", perms + "    <application")
-              with open(path, "w", encoding="utf-8") as f:
+              with open(manifest_path, "w", encoding="utf-8") as f:
                   f.write(content)
           '
 
