@@ -46,6 +46,16 @@ jobs:
       - name: Build Android Release APK
         run: flutter build apk --release
 
+      - name: Verify APK contacts permissions
+        run: |
+          AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -n 1)
+          echo "Using: $AAPT2"
+          PERMS=$("$AAPT2" dump permissions build/app/outputs/flutter-apk/app-release.apk)
+          echo "$PERMS"
+          echo "$PERMS" | grep -q "android.permission.READ_CONTACTS" || { echo "❌ 缺少 READ_CONTACTS 权限"; exit 1; }
+          echo "$PERMS" | grep -q "android.permission.WRITE_CONTACTS" || { echo "❌ 缺少 WRITE_CONTACTS 权限"; exit 1; }
+          echo "✅ 通讯录读写权限已正确注入 APK"
+
       - name: Prepare APK for distribution
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/contacts-importer.apk
