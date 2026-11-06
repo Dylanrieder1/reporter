@@ -1,3 +1,7 @@
 ﻿monitor_build.*
 *.log
 
+__pycache__/
+build_log.zip
+monitor_*.ps1
+.workbuddy/
