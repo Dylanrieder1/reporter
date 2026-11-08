@@ -1,5 +1,6 @@
-﻿monitor_build.*
+monitor_build.*
 *.log
+*.apk
 
 __pycache__/
 build_log.zip

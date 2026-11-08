@@ -3,6 +3,7 @@ import '../models/contact_validation_item.dart';
 import '../models/raw_contact_data.dart';
 import '../services/contact_validator.dart';
 import '../services/contacts_service.dart';
+import '../services/permission_service.dart';
 import 'import_progress_dialog.dart';
 
 /// 导入前预览与核对页面
@@ -42,15 +43,16 @@ class _PreviewPageState extends State<PreviewPage> {
       final cache = await _service.fetchExistingContacts();
       _existingPhones = cache.phones;
       _existingNames = cache.names;
-    } catch (_) {
-      // 若获取系统已有通讯录失败（如缺少权限），降级为空集
+    } catch (e) {
+      // 若获取系统已有通讯录失败（如暂未授权或 OEM 限制），降级为空集，保证列表正常展示
+      debugPrint('获取系统已有联系人失败（优雅降级）: $e');
       _existingPhones = {};
       _existingNames = {};
-    }
-
-    _recomputeValidation();
-    if (mounted) {
-      setState(() => _isLoading = false);
+    } finally {
+      if (mounted) {
+        _recomputeValidation();
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -88,32 +90,59 @@ class _PreviewPageState extends State<PreviewPage> {
       return;
     }
 
+    // 申请写入权限
     final hasPerm = await _service.requestPermission();
     if (!hasPerm) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('未获得通讯录写入权限，无法导入')),
+      showDialog(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          title: const Text('需要通讯录写入权限'),
+          content: const Text('导入联系人需要访问系统通讯录权限，以将手机小号及姓名部门写入手机。\n\n请在系统权限设置中允许本应用读写通讯录。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(dialogCtx).pop();
+                await PermissionService.openSettings();
+              },
+              child: const Text('前往设置'),
+            ),
+          ],
+        ),
       );
       return;
     }
 
     if (!mounted) return;
 
-    final skippedCount = _items.length - validItems.length;
-    final stream = _service.importContactsStream(validItems);
+    try {
+      final skippedCount = _items.length - validItems.length;
+      final stream = _service.importContactsStream(validItems);
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => ImportProgressDialog(
-        progressStream: stream,
-        totalCount: validItems.length,
-        skippedCount: skippedCount,
-        onComplete: () {
-          Navigator.of(context).pop(); // 返回主页
-        },
-      ),
-    );
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => ImportProgressDialog(
+          progressStream: stream,
+          totalCount: validItems.length,
+          skippedCount: skippedCount,
+          onComplete: () {
+            if (mounted) {
+              Navigator.of(context).pop(); // 返回主页
+            }
+          },
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('启动写入出现异常: $e')),
+      );
+    }
   }
 
   @override

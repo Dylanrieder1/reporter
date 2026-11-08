@@ -8,7 +8,11 @@ def configure():
     if os.path.exists(manifest_path):
         with open(manifest_path, "r", encoding="utf-8") as f:
             content = f.read()
-        perms = "    <uses-permission android:name=\"android.permission.READ_CONTACTS\" />\n    <uses-permission android:name=\"android.permission.WRITE_CONTACTS\" />\n"
+        perms = """    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+"""
         if "READ_CONTACTS" not in content:
             content = content.replace("<application", perms + "    <application")
             with open(manifest_path, "w", encoding="utf-8") as f:

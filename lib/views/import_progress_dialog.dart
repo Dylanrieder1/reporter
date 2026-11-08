@@ -45,6 +45,9 @@ class _ImportProgressDialogState extends State<ImportProgressDialog> {
       },
       onError: (err) {
         if (!mounted) return;
+        setState(() {
+          _isFinished = true;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('写入发生异常: $err')),
         );

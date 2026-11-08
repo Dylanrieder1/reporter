@@ -59,14 +59,23 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     });
 
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['xlsx', 'xls', 'csv'],
-        withData: true,
-      );
+      FilePickerResult? result;
+      try {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['xlsx', 'xls', 'csv'],
+          withData: false,
+        );
+      } catch (err) {
+        // 部分 Android OEM ROM 对 custom MIME types 支持有兼容问题，降级为 any 文件选择
+        debugPrint('FileType.custom 异常，降级至 FileType.any: $err');
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.any,
+          withData: false,
+        );
+      }
 
       if (result == null || result.files.isEmpty) {
-        setState(() => _isFileLoading = false);
         return;
       }
 
@@ -75,11 +84,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
       if (bytes == null && file.path != null) {
         final ioFile = File(file.path!);
-        bytes = await ioFile.readAsBytes();
+        if (await ioFile.exists()) {
+          bytes = await ioFile.readAsBytes();
+        }
       }
 
       if (bytes == null || bytes.isEmpty) {
-        throw Exception('无法读取文件内容');
+        throw Exception('未能获取到文件数据，请确认文件路径有效或重新选择');
       }
 
       final parsed = await ExcelParserService.parseFileBytes(bytes, file.name);
@@ -89,10 +100,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       });
     } catch (e) {
       setState(() {
-        _fileError = '解析文件失败: $e';
+        _fileError = '选择/解析文件失败: $e\n提示：若为旧版 .xls 格式，请另存为 .xlsx 或 .csv，或使用“剪贴板粘贴”通道导入。';
       });
     } finally {
-      setState(() => _isFileLoading = false);
+      if (mounted) {
+        setState(() => _isFileLoading = false);
+      }
     }
   }
 
