@@ -24,6 +24,9 @@ class ImportProgressDialog extends StatefulWidget {
 class _ImportProgressDialogState extends State<ImportProgressDialog> {
   int _current = 0;
   String _currentName = '';
+  int _successCount = 0;
+  int _failedCount = 0;
+  String _lastError = '';
   bool _isFinished = false;
 
   @override
@@ -35,6 +38,9 @@ class _ImportProgressDialogState extends State<ImportProgressDialog> {
         setState(() {
           _current = progress.current;
           _currentName = progress.currentName;
+          _successCount = progress.successCount;
+          _failedCount = progress.failedCount;
+          _lastError = progress.lastError;
         });
       },
       onDone: () {
@@ -69,11 +75,17 @@ class _ImportProgressDialogState extends State<ImportProgressDialog> {
         title: Row(
           children: [
             Icon(
-              _isFinished ? Icons.check_circle : Icons.sync,
-              color: _isFinished ? Colors.green : Theme.of(context).primaryColor,
+              _isFinished
+                  ? (_failedCount > 0 ? Icons.warning_amber : Icons.check_circle)
+                  : Icons.sync,
+              color: _isFinished
+                  ? (_failedCount > 0 ? Colors.orange : Colors.green)
+                  : Theme.of(context).primaryColor,
             ),
             const SizedBox(width: 8),
-            Text(_isFinished ? '导入完成' : '正在写入通讯录'),
+            Text(_isFinished
+                ? (_failedCount > 0 ? '导入完成（部分失败）' : '导入完成')
+                : '正在写入通讯录'),
           ],
         ),
         content: Column(
@@ -104,34 +116,89 @@ class _ImportProgressDialogState extends State<ImportProgressDialog> {
                 ),
               ],
             ] else ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '✅ 成功导入: $_current 条',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
+              if (_failedCount == 0) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '✅ 成功导入: $_successCount 条',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '⏭️ 自动跳过: ${widget.skippedCount} 条 (已存在或无效)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.orange.shade800,
+                      const SizedBox(height: 4),
+                      Text(
+                        '⏭️ 自动跳过: ${widget.skippedCount} 条 (已存在或无效)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.orange.shade800,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+              ] else ...[
+                // 存在写入失败：如实展示失败条数与原因，绝谎报成功
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _successCount > 0 ? Colors.orange.shade50 : Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '✅ 成功导入: $_successCount 条',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: _successCount > 0 ? Colors.orange.shade900 : Colors.red,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '❌ 写入失败: $_failedCount 条',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '⏭️ 自动跳过: ${widget.skippedCount} 条',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.orange.shade800,
+                        ),
+                      ),
+                      if (_lastError.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          '失败原因: $_lastError',
+                          style: TextStyle(fontSize: 12, color: Colors.red.shade700),
+                          maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          '排查建议：在系统设置 → 应用权限中确认已允许「通讯录」权限；部分机型（如小米/华为）还需在其自带权限管理中放行。',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ],
           ],
         ),

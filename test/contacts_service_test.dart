@@ -46,5 +46,57 @@ void main() {
       expect(mock.insertedRecords[1]['name'], '王五-财务部');
       expect(mock.insertedRecords[1]['phone'], '13933334444');
     });
+
+    test('should report real failure counts instead of fake success', () async {
+      final service = ContactsService(_FailingProvider());
+
+      final items = [
+        const ContactValidationItem(
+          raw: RawContactData(name: '赵六', phone: '13755556666'),
+          status: ValidationStatus.valid,
+          formattedDisplayName: '赵六',
+        ),
+        const ContactValidationItem(
+          raw: RawContactData(name: '钱七', phone: '13666667777'),
+          status: ValidationStatus.valid,
+          formattedDisplayName: '钱七',
+        ),
+      ];
+
+      int success = -1;
+      int failed = -1;
+      String lastError = '';
+      await for (final p in service.importContactsStream(items)) {
+        success = p.successCount;
+        failed = p.failedCount;
+        lastError = p.lastError;
+      }
+
+      // 关键断言：失败必须如实上报，绝不静默计为成功
+      expect(success, 0);
+      expect(failed, 2);
+      expect(lastError, contains('mock write denied'));
+    });
   });
+}
+
+/// 模拟写入总是被系统拒绝的 Provider（如权限被 ROM 拦截）
+class _FailingProvider implements IContactsProvider {
+  @override
+  Future<bool> requestPermission() async => true;
+
+  @override
+  Future<ExistingContactsCache> getExistingContacts() async {
+    return const ExistingContactsCache(phones: {}, names: {});
+  }
+
+  @override
+  Future<bool> insertContact({
+    required String displayName,
+    required String phone,
+    required String department,
+    required String title,
+  }) async {
+    throw Exception('mock write denied');
+  }
 }
