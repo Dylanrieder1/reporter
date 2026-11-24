@@ -7,6 +7,7 @@ import '../models/column_mapping.dart';
 import '../models/raw_contact_data.dart';
 import '../services/excel_parser_service.dart';
 import '../services/text_parser_service.dart';
+import 'export_page.dart';
 import 'preview_page.dart';
 
 /// 首页：双通道（表格文件选择 & 剪贴板文本粘贴）
@@ -33,7 +34,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _textController.addListener(_onTextChanged);
   }
 
@@ -143,6 +144,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           tabs: const [
             Tab(icon: Icon(Icons.table_chart), text: 'Excel/CSV 表格导入'),
             Tab(icon: Icon(Icons.content_paste), text: '剪贴板文本粘贴'),
+            Tab(icon: Icon(Icons.file_upload_outlined), text: '通讯录导出'),
           ],
         ),
       ),
@@ -151,6 +153,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         children: [
           _buildFileTab(),
           _buildClipboardTab(),
+          const ExportPage(),
         ],
       ),
     );
