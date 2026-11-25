@@ -175,7 +175,9 @@ class FlutterContactsProvider implements IContactsProvider {
   @override
   Future<bool> deleteContact(String id) async {
     try {
-      await FlutterContacts.deleteContact(id);
+      // flutter_contacts 的 deleteContact API 接收 Contact 对象，
+      // 仅携带系统分配的 id 即可定位并删除
+      await FlutterContacts.deleteContact(Contact(id: id));
       return true;
     } catch (e) {
       debugPrint('删除联系人 $id 失败: $e');
