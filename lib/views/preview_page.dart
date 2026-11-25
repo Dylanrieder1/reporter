@@ -76,18 +76,8 @@ class _PreviewPageState extends State<PreviewPage> {
       existingNames: _existingNames,
       appendDeptTitleToName: _appendDeptTitle,
     );
-    // 数据重算后恢复默认选择：全选有效条目
-    _resetSelection();
-  }
-
-  /// 默认全选所有有效条目（用户可自由取消或增选）
-  void _resetSelection() {
-    _selectedIndexes
-      ..clear()
-      ..addAll([
-        for (int i = 0; i < _items.length; i++)
-          if (_items[i].isValid) i,
-      ]);
+    // 默认不预选任何条目：由用户自行勾选要导入的联系人。
+    // 重算校验（如切换来电显示开关）时保留用户已勾选状态（下标与 rawList 一一对应）。
   }
 
   void _toggleItemSelection(int index) {
@@ -190,10 +180,13 @@ class _PreviewPageState extends State<PreviewPage> {
           progressStream: stream,
           totalCount: validItems.length,
           skippedCount: skippedCount,
-          onComplete: () {
-            if (mounted) {
-              Navigator.of(context).pop(); // 返回主页
-            }
+          onFinish: () {
+            if (mounted) Navigator.of(context).pop(); // 返回主页
+          },
+          onContinueImport: () {
+            // 留在预览页并重新查重：刚导入的条目会标记为"号码已存在"，
+            // 用户可继续筛选/勾选导入剩余联系人，无需重新选文件粘贴
+            if (mounted) _loadExistingContactsAndValidate();
           },
         ),
       );
@@ -319,7 +312,7 @@ class _PreviewPageState extends State<PreviewPage> {
                       Icon(Icons.checklist, size: 18, color: Colors.blue.shade700),
                       const SizedBox(width: 6),
                       Text(
-                        '已选 ${_selectedIndexes.length} / $validCount 条',
+                        '已选 ${_selectedValidItems.length} / $validCount 条',
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -376,12 +369,16 @@ class _PreviewPageState extends State<PreviewPage> {
                     child: SizedBox(
                       width: double.infinity,
                       height: 48,
-                      child: FilledButton.icon(
-                        icon: const Icon(Icons.contacts),
-                        label: Text('导入所选 (${_selectedIndexes.length} 条)'),
-                        onPressed:
-                            _selectedIndexes.isNotEmpty ? _startImport : null,
-                      ),
+                      child: Builder(builder: (ctx) {
+                        final selectedValidCount = _selectedValidItems.length;
+                        return FilledButton.icon(
+                          icon: const Icon(Icons.contacts),
+                          label: Text('导入所选 ($selectedValidCount 条)'),
+                          onPressed: selectedValidCount > 0
+                              ? _startImport
+                              : null,
+                        );
+                      }),
                     ),
                   ),
                 ),

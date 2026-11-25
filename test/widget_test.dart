@@ -12,8 +12,10 @@ void main() {
 
     // 检查首页标题与标签页
     expect(find.text('通讯录导入助手'), findsOneWidget);
-    expect(find.text('Excel/CSV 表格导入'), findsOneWidget);
-    expect(find.text('剪贴板文本粘贴'), findsOneWidget);
+    expect(find.text('表格导入'), findsOneWidget);
+    expect(find.text('文本粘贴'), findsOneWidget);
+    expect(find.text('导出 Excel'), findsOneWidget);
+    expect(find.text('通讯录管理'), findsOneWidget);
   });
 
   testWidgets('PreviewPage displays incoming call switch and stats', (WidgetTester tester) async {
@@ -59,10 +61,18 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    // 默认全选有效条目：按钮显示 2 条
+    // 默认不选：按钮计数为 0（禁用状态）
+    expect(find.text('导入所选 (0 条)'), findsOneWidget);
+
+    // 勾选两条 → 按钮计数变为 2
+    await tester.tap(find.text('张三-研发部-架构师'));
+    await tester.pump();
+    expect(find.text('导入所选 (1 条)'), findsOneWidget);
+    await tester.tap(find.text('李四-云中台-工程师'));
+    await tester.pump();
     expect(find.text('导入所选 (2 条)'), findsOneWidget);
 
-    // 取消勾选张三所在行 → 按钮计数变为 1
+    // 取消勾选张三 → 计数回落为 1
     await tester.tap(find.text('张三-研发部-架构师'));
     await tester.pump();
     expect(find.text('导入所选 (1 条)'), findsOneWidget);

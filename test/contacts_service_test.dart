@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:contacts_importer/models/contact_validation_item.dart';
+import 'package:contacts_importer/models/managed_contact.dart';
 import 'package:contacts_importer/models/raw_contact_data.dart';
 import 'package:contacts_importer/services/contacts_service.dart';
 
@@ -77,6 +78,50 @@ void main() {
       expect(failed, 2);
       expect(lastError, contains('mock write denied'));
     });
+
+    test('should manage and delete contacts by id', () async {
+      final mock = MockContactsProvider(initialContacts: [
+        const ManagedContact(id: 'c1', displayName: '张三', phone: '13800000000'),
+        const ManagedContact(id: 'c2', displayName: '李四', phone: '13900000000'),
+      ]);
+      final service = ContactsService(mock);
+
+      // 读取管理列表
+      final list = await service.fetchManagedContacts();
+      expect(list.length, 2);
+      expect(list[0].id, 'c1');
+
+      // 删除 c1 → 成功且列表只剩一条
+      final ok = await service.deleteContact('c1');
+      expect(ok, isTrue);
+      final after = await service.fetchManagedContacts();
+      expect(after.length, 1);
+      expect(after[0].id, 'c2');
+
+      // 删除不存在的 id → 返回 false
+      final bad = await service.deleteContact('not-exist');
+      expect(bad, isFalse);
+    });
+
+    test('insertContact should also register into managed store', () async {
+      final mock = MockContactsProvider();
+      final service = ContactsService(mock);
+
+      await service.requestPermission();
+      final items = [
+        const ContactValidationItem(
+          raw: RawContactData(name: '赵六', phone: '13755556666'),
+          status: ValidationStatus.valid,
+          formattedDisplayName: '赵六',
+        ),
+      ];
+      await for (final _ in service.importContactsStream(items)) {}
+
+      final managed = await service.fetchManagedContacts();
+      expect(managed.length, 1);
+      expect(managed[0].displayName, '赵六');
+      expect(managed[0].id, isNotEmpty);
+    });
   });
 }
 
@@ -99,4 +144,10 @@ class _FailingProvider implements IContactsProvider {
   }) async {
     throw Exception('mock write denied');
   }
+
+  @override
+  Future<List<ManagedContact>> getManagedContacts() async => const [];
+
+  @override
+  Future<bool> deleteContact(String id) async => false;
 }

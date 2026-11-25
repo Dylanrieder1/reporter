@@ -7,14 +7,20 @@ class ImportProgressDialog extends StatefulWidget {
   final Stream<ImportProgress> progressStream;
   final int totalCount;
   final int skippedCount;
-  final VoidCallback onComplete;
+
+  /// 完成：关闭弹窗并返回主页
+  final VoidCallback onFinish;
+
+  /// 继续导入：关闭弹窗回到预览页（重新查重后可继续勾选剩余联系人）
+  final VoidCallback onContinueImport;
 
   const ImportProgressDialog({
     super.key,
     required this.progressStream,
     required this.totalCount,
     required this.skippedCount,
-    required this.onComplete,
+    required this.onFinish,
+    required this.onContinueImport,
   });
 
   @override
@@ -203,14 +209,22 @@ class _ImportProgressDialogState extends State<ImportProgressDialog> {
           ],
         ),
         actions: [
-          if (_isFinished)
+          if (_isFinished) ...[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onFinish();
+              },
+              child: const Text('完成'),
+            ),
             FilledButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                widget.onComplete();
+                widget.onContinueImport();
               },
-              child: const Text('完成并返回'),
+              child: const Text('继续选择导入'),
             ),
+          ],
         ],
       ),
     );

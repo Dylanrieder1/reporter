@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import '../models/contact_validation_item.dart';
 import '../models/import_progress.dart';
+import '../models/managed_contact.dart';
 
 /// 已有通讯录数据缓存（供查重使用）
 class ExistingContactsCache {
@@ -29,6 +30,12 @@ abstract class IContactsProvider {
     required String department,
     required String title,
   });
+
+  /// 读取带系统 id 的联系人列表（用于通讯录管理/批量删除）
+  Future<List<ManagedContact>> getManagedContacts();
+
+  /// 删除指定 id 的系统联系人；返回 true 表示删除成功
+  Future<bool> deleteContact(String id);
 }
 
 /// 基于 flutter_contacts 的原生真机适配器
@@ -136,19 +143,68 @@ class FlutterContactsProvider implements IContactsProvider {
       }
     }
   }
+
+  @override
+  Future<List<ManagedContact>> getManagedContacts() async {
+    try {
+      final hasPerm = await FlutterContacts.requestPermission(readonly: true);
+      if (!hasPerm) return const [];
+
+      final contacts = await FlutterContacts.getContacts(
+        withProperties: true,
+        withAccounts: false,
+      );
+
+      return [
+        for (final c in contacts)
+          ManagedContact(
+            id: c.id,
+            displayName: c.displayName,
+            phone: c.phones.isNotEmpty ? c.phones.first.number : '',
+            department: c.organizations.isNotEmpty
+                ? c.organizations.first.company
+                : '',
+          ),
+      ];
+    } catch (e) {
+      debugPrint('读取通讯录管理列表失败（优雅降级）: $e');
+      return const [];
+    }
+  }
+
+  @override
+  Future<bool> deleteContact(String id) async {
+    try {
+      await FlutterContacts.deleteContact(id);
+      return true;
+    } catch (e) {
+      debugPrint('删除联系人 $id 失败: $e');
+      return false;
+    }
+  }
 }
 
 /// 模拟内存通讯录适配器（用于纯单元测试与无真机环境验证）
 class MockContactsProvider implements IContactsProvider {
   final Set<String> mockPhones;
   final Set<String> mockNames;
-  final List<Map<String, String>> insertedRecords = [];
+  final List<Map<String, String>> insertedRecords;
+
+  /// 内存中的"已写入联系人"存储（模拟系统通讯录，供管理/删除测试）
+  final List<ManagedContact> managedStore = [];
+  int _nextMockId = 1;
 
   MockContactsProvider({
     Set<String>? initialPhones,
     Set<String>? initialNames,
+    List<ManagedContact>? initialContacts,
   })  : mockPhones = initialPhones ?? {},
-        mockNames = initialNames ?? {};
+        mockNames = initialNames ?? {},
+        insertedRecords = [] {
+    if (initialContacts != null) {
+      managedStore.addAll(initialContacts);
+    }
+  }
 
   @override
   Future<bool> requestPermission() async => true;
@@ -173,7 +229,24 @@ class MockContactsProvider implements IContactsProvider {
     });
     mockPhones.add(phone);
     mockNames.add(displayName);
+    managedStore.add(ManagedContact(
+      id: 'mock-${_nextMockId++}',
+      displayName: displayName,
+      phone: phone,
+      department: department,
+    ));
     return true;
+  }
+
+  @override
+  Future<List<ManagedContact>> getManagedContacts() async =>
+      List.unmodifiable(managedStore);
+
+  @override
+  Future<bool> deleteContact(String id) async {
+    final before = managedStore.length;
+    managedStore.removeWhere((c) => c.id == id);
+    return managedStore.length < before;
   }
 }
 
@@ -190,6 +263,16 @@ class ContactsService {
 
   Future<ExistingContactsCache> fetchExistingContacts() async {
     return await _provider.getExistingContacts();
+  }
+
+  /// 读取带系统 id 的联系人列表（通讯录管理页使用）
+  Future<List<ManagedContact>> fetchManagedContacts() async {
+    return await _provider.getManagedContacts();
+  }
+
+  /// 删除单个系统联系人
+  Future<bool> deleteContact(String id) async {
+    return await _provider.deleteContact(id);
   }
 
   /// 异步批量写入联系人，并以 Stream 形式持续对外抛出写入进度。

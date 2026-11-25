@@ -8,6 +8,7 @@ import '../models/raw_contact_data.dart';
 import '../services/excel_parser_service.dart';
 import '../services/text_parser_service.dart';
 import 'export_page.dart';
+import 'delete_page.dart';
 import 'preview_page.dart';
 
 /// 首页：双通道（表格文件选择 & 剪贴板文本粘贴）
@@ -139,12 +140,22 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return Scaffold(
       appBar: AppBar(
         title: const Text('通讯录导入助手'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: '使用指南',
+            onPressed: _showHelpSheet,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: const [
-            Tab(icon: Icon(Icons.table_chart), text: 'Excel/CSV 表格导入'),
-            Tab(icon: Icon(Icons.content_paste), text: '剪贴板文本粘贴'),
-            Tab(icon: Icon(Icons.file_upload_outlined), text: '通讯录导出'),
+            Tab(icon: Icon(Icons.table_chart), text: '表格导入'),
+            Tab(icon: Icon(Icons.content_paste), text: '文本粘贴'),
+            Tab(icon: Icon(Icons.file_upload_outlined), text: '导出 Excel'),
+            Tab(icon: Icon(Icons.manage_accounts), text: '通讯录管理'),
           ],
         ),
       ),
@@ -154,6 +165,68 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           _buildFileTab(),
           _buildClipboardTab(),
           const ExportPage(),
+          const DeletePage(),
+        ],
+      ),
+    );
+  }
+
+  /// 首页使用指南（底部弹层）
+  void _showHelpSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('使用指南',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              _helpItem('1', '表格导入：选择 Excel/CSV → 核对列匹配 → 预览页搜索筛选（如"云中台"）→ 勾选要导入的联系人 → 导入所选'),
+              _helpItem('2', '文本粘贴：粘贴多行文本（微信/钉钉复制）→ 自动识别 → 进入预览核对'),
+              _helpItem('3', '导出 Excel：读取手机通讯录 → 勾选 → 导出为表格，可再通过表格导入导回'),
+              _helpItem('4', '通讯录管理：搜索筛选 → 勾选 → 批量删除手机中的联系人（有二次确认）'),
+              const Divider(height: 20),
+              _helpItem('提示', '预览页默认不勾选，勾选状态在搜索/筛选切换时保留；支持公司小号（3~8 位短号）；导入完成后可"继续选择导入"处理剩余联系人'),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('我知道了'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _helpItem(String tag, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(tag,
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text,
+                style: const TextStyle(fontSize: 13, height: 1.5)),
+          ),
         ],
       ),
     );
