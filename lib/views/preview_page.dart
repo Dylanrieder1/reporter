@@ -35,6 +35,9 @@ class _PreviewPageState extends State<PreviewPage> {
   Set<String> _existingNames = {};
   List<ContactValidationItem> _items = [];
 
+  // 手动勾选：记录用户选中条目在 _items 中的下标（跨筛选/搜索保留）
+  final Set<int> _selectedIndexes = {};
+
   @override
   void initState() {
     super.initState();
@@ -73,6 +76,28 @@ class _PreviewPageState extends State<PreviewPage> {
       existingNames: _existingNames,
       appendDeptTitleToName: _appendDeptTitle,
     );
+    // 数据重算后恢复默认选择：全选有效条目
+    _resetSelection();
+  }
+
+  /// 默认全选所有有效条目（用户可自由取消或增选）
+  void _resetSelection() {
+    _selectedIndexes
+      ..clear()
+      ..addAll([
+        for (int i = 0; i < _items.length; i++)
+          if (_items[i].isValid) i,
+      ]);
+  }
+
+  void _toggleItemSelection(int index) {
+    setState(() {
+      if (_selectedIndexes.contains(index)) {
+        _selectedIndexes.remove(index);
+      } else {
+        _selectedIndexes.add(index);
+      }
+    });
   }
 
   void _toggleAppendDeptTitle(bool value) {
@@ -109,11 +134,17 @@ class _PreviewPageState extends State<PreviewPage> {
   List<ContactValidationItem> get _importableVisibleItems =>
       _filteredItems.where((e) => e.isValid).toList();
 
+  /// 用户勾选的有效条目（按下标顺序，跨筛选保留）
+  List<ContactValidationItem> get _selectedValidItems => <ContactValidationItem>[
+        for (int i = 0; i < _items.length; i++)
+          if (_selectedIndexes.contains(i) && _items[i].isValid) _items[i],
+      ];
+
   Future<void> _startImport() async {
-    final validItems = _importableVisibleItems;
+    final validItems = _selectedValidItems;
     if (validItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前没有有效待导入的联系人')),
+        const SnackBar(content: Text('请先勾选要导入的联系人')),
       );
       return;
     }
@@ -148,8 +179,8 @@ class _PreviewPageState extends State<PreviewPage> {
     if (!mounted) return;
 
     try {
-      // 跳过数只统计当前筛选范围内被跳过的条目（筛选掉的条目不计入）
-      final skippedCount = _filteredItems.length - validItems.length;
+      // 跳过数 = 全部条目 - 本次实际导入的条目（含校验跳过与未勾选的有效条目）
+      final skippedCount = _items.length - validItems.length;
       final stream = _service.importContactsStream(validItems);
 
       showDialog(
@@ -238,7 +269,7 @@ class _PreviewPageState extends State<PreviewPage> {
                                 setState(() => _searchKeyword = '');
                               },
                             ),
-                      hintText: '搜索筛选：姓名 / 部门 / 职位 / 号码（如：云中台）',
+                      hintText: '搜索筛选：姓名 / 部门 / 职位 / 号码（如：云中台），可勾选后导入',
                       hintStyle: const TextStyle(fontSize: 13),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -280,7 +311,40 @@ class _PreviewPageState extends State<PreviewPage> {
                 ),
                 const SizedBox(height: 8),
 
-                // 4. 联系人预览列表
+                // 3.5 手动勾选控制行：跨筛选保留，"选当前筛选"可一键勾选可见的有效条目
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                  child: Row(
+                    children: [
+                      Icon(Icons.checklist, size: 18, color: Colors.blue.shade700),
+                      const SizedBox(width: 6),
+                      Text(
+                        '已选 ${_selectedIndexes.length} / $validCount 条',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade800),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        child: const Text('选当前筛选', style: TextStyle(fontSize: 13)),
+                        onPressed: () {
+                          setState(() {
+                            for (final e in _importableVisibleItems) {
+                              _selectedIndexes.add(_items.indexOf(e));
+                            }
+                          });
+                        },
+                      ),
+                      TextButton(
+                        child: const Text('清空选择', style: TextStyle(fontSize: 13)),
+                        onPressed: _selectedIndexes.isEmpty
+                            ? null
+                            : () => setState(() => _selectedIndexes.clear()),
+                      ),
+                    ],
+                  ),
+                ),
                 Expanded(
                   child: _filteredItems.isEmpty
                       ? const Center(child: Text('没有匹配的记录'))
@@ -312,20 +376,12 @@ class _PreviewPageState extends State<PreviewPage> {
                     child: SizedBox(
                       width: double.infinity,
                       height: 48,
-                      child: Builder(builder: (ctx) {
-                        final visibleValidCount =
-                            _importableVisibleItems.length;
-                        final isFiltered = _searchKeyword.trim().isNotEmpty ||
-                            _selectedFilterIndex != 0;
-                        return FilledButton.icon(
-                          icon: const Icon(Icons.contacts),
-                          label: Text(isFiltered
-                              ? '只导入筛选结果 ($visibleValidCount 条)'
-                              : '开始写入系统通讯录 ($visibleValidCount 条)'),
-                          onPressed:
-                              visibleValidCount > 0 ? _startImport : null,
-                        );
-                      }),
+                      child: FilledButton.icon(
+                        icon: const Icon(Icons.contacts),
+                        label: Text('导入所选 (${_selectedIndexes.length} 条)'),
+                        onPressed:
+                            _selectedIndexes.isNotEmpty ? _startImport : null,
+                      ),
                     ),
                   ),
                 ),
@@ -355,6 +411,8 @@ class _PreviewPageState extends State<PreviewPage> {
   }
 
   Widget _buildContactTile(ContactValidationItem item) {
+    final itemIndex = _items.indexOf(item);
+    final bool selected = _selectedIndexes.contains(itemIndex);
     final Color badgeColor;
     switch (item.status) {
       case ValidationStatus.valid:
@@ -372,12 +430,22 @@ class _PreviewPageState extends State<PreviewPage> {
         break;
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          CircleAvatar(
+    return InkWell(
+      onTap: item.isValid ? () => _toggleItemSelection(itemIndex) : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // 勾选框：仅有效条目可选；勾选状态跨筛选/搜索保留
+            Checkbox(
+              value: item.isValid && selected,
+              tristate: false,
+              onChanged: item.isValid
+                  ? (_) => _toggleItemSelection(itemIndex)
+                  : null,
+            ),
+            CircleAvatar(
             backgroundColor: item.isValid ? Colors.blue.shade50 : Colors.grey.shade200,
             child: Text(
               item.raw.name.isNotEmpty ? item.raw.name.characters.first : '?',
@@ -421,7 +489,8 @@ class _PreviewPageState extends State<PreviewPage> {
               style: TextStyle(fontSize: 12, color: badgeColor, fontWeight: FontWeight.w500),
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -40,4 +40,41 @@ void main() {
     expect(find.text('来电显示优化（姓名附加部门/职务）'), findsOneWidget);
     expect(find.text('张三-研发部-架构师'), findsOneWidget);
   });
+
+  testWidgets('PreviewPage selection toggles update import button', (WidgetTester tester) async {
+    final mockService = ContactsService(MockContactsProvider());
+    final rawContacts = [
+      const RawContactData(name: '张三', phone: '13800000000', department: '研发部', title: '架构师'),
+      const RawContactData(name: '李四', phone: '13900000000', department: '云中台', title: '工程师'),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PreviewPage(
+          rawContacts: rawContacts,
+          contactsService: mockService,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // 默认全选有效条目：按钮显示 2 条
+    expect(find.text('导入所选 (2 条)'), findsOneWidget);
+
+    // 取消勾选张三所在行 → 按钮计数变为 1
+    await tester.tap(find.text('张三-研发部-架构师'));
+    await tester.pump();
+    expect(find.text('导入所选 (1 条)'), findsOneWidget);
+
+    // 清空选择 → 按钮计数为 0（按钮禁用）
+    await tester.tap(find.text('清空选择'));
+    await tester.pump();
+    expect(find.text('导入所选 (0 条)'), findsOneWidget);
+
+    // "选当前筛选"一键勾选全部可见有效条目 → 恢复 2 条
+    await tester.tap(find.text('选当前筛选'));
+    await tester.pump();
+    expect(find.text('导入所选 (2 条)'), findsOneWidget);
+  });
 }
