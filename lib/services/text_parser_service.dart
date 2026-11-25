@@ -7,6 +7,9 @@ class TextParserService {
     r'(?:(?:\+|00)?86[\s\-]?)?1[3-9]\d[\s\-]?\d{4}[\s\-]?\d{4}',
   );
 
+  /// 公司内部小号：3~8 位纯数字、非 0 开头（如 660065）
+  static final RegExp _shortNumberRegex = RegExp(r'^[1-9]\d{2,7}$');
+
   /// 常见部门关键词
   static final RegExp _deptKeywordRegex = RegExp(
     r'部|科|组|中心|院|所|室|局|处|行|馆|团队|部门|分公司|支行|team|dept',
@@ -52,8 +55,8 @@ class TextParserService {
     // 1. 查找手机号
     final match = _phoneRegex.firstMatch(line);
     if (match == null) {
-      // 若该行无手机号，尝试直接作为纯人名（若单行仅一个人名）或跳过
-      return null;
+      // 无手机号：尝试将行内独立的 3~8 位数字识别为公司小号（如 660065）
+      return _parseShortNumberLine(line);
     }
 
     final rawPhoneStr = match.group(0)!;
@@ -112,6 +115,59 @@ class TextParserService {
     return RawContactData(
       name: name,
       phone: phone,
+      department: department,
+      title: title,
+    );
+  }
+
+  /// 公司小号行解析：行内无 11 位手机号时，把第一个独立的 3~8 位数字
+  /// （非 0 开头）token 识别为小号，其余 token 按部门/职位/姓名归类。
+  static RawContactData? _parseShortNumberLine(String line) {
+    final tokens = line
+        .split(RegExp(r'[\t,，;；|/ ]+'))
+        .map((e) => e.replaceAll(RegExp(r'^[#*:\-—]+|[#*:\-—]+$'), '').trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    String? shortPhone;
+    final rest = <String>[];
+    for (final token in tokens) {
+      if (shortPhone == null && _shortNumberRegex.hasMatch(token)) {
+        shortPhone = token;
+      } else {
+        rest.add(token);
+      }
+    }
+    if (shortPhone == null) return null;
+
+    String name = '';
+    String department = '';
+    String title = '';
+    final unassignedTokens = <String>[];
+
+    for (final token in rest) {
+      if (department.isEmpty && _deptKeywordRegex.hasMatch(token)) {
+        department = token;
+      } else if (title.isEmpty && _titleKeywordRegex.hasMatch(token)) {
+        title = token;
+      } else {
+        unassignedTokens.add(token);
+      }
+    }
+
+    if (unassignedTokens.isNotEmpty) {
+      name = unassignedTokens.removeAt(0);
+    }
+    if (department.isEmpty && unassignedTokens.isNotEmpty) {
+      department = unassignedTokens.removeAt(0);
+    }
+    if (title.isEmpty && unassignedTokens.isNotEmpty) {
+      title = unassignedTokens.removeAt(0);
+    }
+
+    return RawContactData(
+      name: name,
+      phone: shortPhone,
       department: department,
       title: title,
     );

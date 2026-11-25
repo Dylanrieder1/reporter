@@ -86,7 +86,10 @@ class ContactValidator:
 
     @classmethod
     def is_valid_mobile(cls, phone):
-        return bool(re.match(r'^1[3-9]\d{9}$', phone))
+        # 大陆手机号 或 公司内部小号（3~8 位、非 0 开头，如 660065）
+        if re.match(r'^1[3-9]\d{9}$', phone):
+            return True
+        return bool(re.match(r'^[1-9]\d{2,7}$', phone))
 
     @classmethod
     def format_display_name(cls, name, department, title, append_dept_title):

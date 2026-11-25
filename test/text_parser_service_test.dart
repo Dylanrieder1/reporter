@@ -50,10 +50,10 @@ void main() {
 
     test('should ignore empty lines and lines without valid phone number', () {
       const input = '''
-        
+
         通知：请各部门查收小号
         孙七 13500001111
-        
+
         无电话测试人员
         周八 13422223333 客服部
       ''';
@@ -65,6 +65,30 @@ void main() {
       expect(list[1].name, '周八');
       expect(list[1].phone, '13422223333');
       expect(list[1].department, '客服部');
+    });
+
+    test('should parse company short numbers from text lines', () {
+      const input = '''
+张三 660065 云中台 架构师
+李四, 660066, 市场部, 总监
+王五 8888
+''';
+      final list = TextParserService.parseText(input);
+
+      expect(list.length, 3);
+
+      expect(list[0].name, '张三');
+      expect(list[0].phone, '660065');
+      expect(list[0].department, '云中台');
+      expect(list[0].title, '架构师');
+
+      expect(list[1].name, '李四');
+      expect(list[1].phone, '660066');
+      expect(list[1].department, '市场部');
+      expect(list[1].title, '总监');
+
+      expect(list[2].name, '王五');
+      expect(list[2].phone, '8888');
     });
   });
 }

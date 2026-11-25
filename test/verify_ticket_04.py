@@ -18,7 +18,10 @@ class ContactValidator:
 
     @classmethod
     def is_valid_mobile(cls, phone):
-        return bool(re.match(r'^1[3-9]\d{9}$', phone))
+        # 大陆手机号 或 公司内部小号（3~8 位、非 0 开头，如 660065）
+        if re.match(r'^1[3-9]\d{9}$', phone):
+            return True
+        return bool(re.match(r'^[1-9]\d{2,7}$', phone))
 
     @classmethod
     def format_display_name(cls, name, department, title, append_dept_title):
@@ -106,13 +109,20 @@ def test_runner():
 
     # Case 4: Invalid phone and empty name
     raw_list3 = [
-        {'name': '王五', 'phone': '12345'},
+        {'name': '王五', 'phone': '0123456'},
         {'name': '', 'phone': '13811112222'}
     ]
     res3 = ContactValidator.validate(raw_list3, set(), set(), False)
     assert res3[0]['status'] == ValidationStatus.SKIPPED_INVALID_PHONE
     assert res3[1]['status'] == ValidationStatus.SKIPPED_EMPTY_NAME
     print("[PASS] Case 4: Invalid phone and empty name")
+
+    # Case 4.5: Company short numbers are now valid
+    raw_short = [{'name': '小号同事', 'phone': '660065'}]
+    res_short = ContactValidator.validate(raw_short, set(), set(), False)
+    assert res_short[0]['status'] == ValidationStatus.VALID
+    assert res_short[0]['raw']['phone'] == '660065'
+    print("[PASS] Case 4.5: Company short number 660065 accepted")
 
     # Case 5: Intra-batch duplicates
     raw_list4 = [

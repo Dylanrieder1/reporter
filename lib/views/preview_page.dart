@@ -27,6 +27,10 @@ class _PreviewPageState extends State<PreviewPage> {
   bool _appendDeptTitle = true; // 默认开启来电显示优化
   int _selectedFilterIndex = 0; // 0: 全部, 1: 待导入, 2: 已跳过
 
+  // 搜索筛选（如输入"云中台"只看该部门的联系人）
+  final TextEditingController _searchController = TextEditingController();
+  String _searchKeyword = '';
+
   Set<String> _existingPhones = {};
   Set<String> _existingNames = {};
   List<ContactValidationItem> _items = [];
@@ -36,6 +40,12 @@ class _PreviewPageState extends State<PreviewPage> {
     super.initState();
     _service = widget.contactsService ?? ContactsService();
     _loadExistingContactsAndValidate();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadExistingContactsAndValidate() async {
@@ -72,17 +82,35 @@ class _PreviewPageState extends State<PreviewPage> {
     });
   }
 
+  /// 当前可见条目 = 状态筛选（全部/待导入/已跳过） ∩ 关键字搜索
   List<ContactValidationItem> get _filteredItems {
+    Iterable<ContactValidationItem> items = _items;
     if (_selectedFilterIndex == 1) {
-      return _items.where((e) => e.isValid).toList();
+      items = items.where((e) => e.isValid);
     } else if (_selectedFilterIndex == 2) {
-      return _items.where((e) => !e.isValid).toList();
+      items = items.where((e) => !e.isValid);
     }
-    return _items;
+
+    final kw = _searchKeyword.trim().toLowerCase();
+    if (kw.isNotEmpty) {
+      items = items.where((e) {
+        final raw = e.raw;
+        return raw.name.toLowerCase().contains(kw) ||
+            e.formattedDisplayName.toLowerCase().contains(kw) ||
+            raw.department.toLowerCase().contains(kw) ||
+            raw.title.toLowerCase().contains(kw) ||
+            raw.phone.contains(kw);
+      });
+    }
+    return items.toList();
   }
 
+  /// 当前筛选范围内可导入的条目
+  List<ContactValidationItem> get _importableVisibleItems =>
+      _filteredItems.where((e) => e.isValid).toList();
+
   Future<void> _startImport() async {
-    final validItems = _items.where((e) => e.isValid).toList();
+    final validItems = _importableVisibleItems;
     if (validItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('当前没有有效待导入的联系人')),
@@ -120,7 +148,8 @@ class _PreviewPageState extends State<PreviewPage> {
     if (!mounted) return;
 
     try {
-      final skippedCount = _items.length - validItems.length;
+      // 跳过数只统计当前筛选范围内被跳过的条目（筛选掉的条目不计入）
+      final skippedCount = _filteredItems.length - validItems.length;
       final stream = _service.importContactsStream(validItems);
 
       showDialog(
@@ -191,6 +220,35 @@ class _PreviewPageState extends State<PreviewPage> {
                   ),
                 ),
 
+                // 1.5 搜索筛选框（按姓名/部门/职位/号码过滤，只导入筛选结果）
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _searchKeyword = v),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      suffixIcon: _searchKeyword.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchKeyword = '');
+                              },
+                            ),
+                      hintText: '搜索筛选：姓名 / 部门 / 职位 / 号码（如：云中台）',
+                      hintStyle: const TextStyle(fontSize: 13),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                ),
+
                 // 2. 统计状态栏
                 Padding(
                   padding: const EdgeInsets.all(12),
@@ -254,11 +312,20 @@ class _PreviewPageState extends State<PreviewPage> {
                     child: SizedBox(
                       width: double.infinity,
                       height: 48,
-                      child: FilledButton.icon(
-                        icon: const Icon(Icons.contacts),
-                        label: Text('开始写入系统通讯录 ($validCount 条)'),
-                        onPressed: validCount > 0 ? _startImport : null,
-                      ),
+                      child: Builder(builder: (ctx) {
+                        final visibleValidCount =
+                            _importableVisibleItems.length;
+                        final isFiltered = _searchKeyword.trim().isNotEmpty ||
+                            _selectedFilterIndex != 0;
+                        return FilledButton.icon(
+                          icon: const Icon(Icons.contacts),
+                          label: Text(isFiltered
+                              ? '只导入筛选结果 ($visibleValidCount 条)'
+                              : '开始写入系统通讯录 ($visibleValidCount 条)'),
+                          onPressed:
+                              visibleValidCount > 0 ? _startImport : null,
+                        );
+                      }),
                     ),
                   ),
                 ),

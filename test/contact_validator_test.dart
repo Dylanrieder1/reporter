@@ -63,7 +63,7 @@ void main() {
 
     test('should flag invalid phone numbers and empty names', () {
       final rawList = [
-        const RawContactData(name: '王五', phone: '12345'), // 非法号码
+        const RawContactData(name: '王五', phone: '0123456'), // 0 开头，非法
         const RawContactData(name: '', phone: '13811112222'), // 空人名
       ];
 
@@ -76,6 +76,45 @@ void main() {
 
       expect(items[0].status, ValidationStatus.skippedInvalidPhone);
       expect(items[1].status, ValidationStatus.skippedEmptyName);
+    });
+
+    test('should accept company short numbers like 660065', () {
+      final rawList = [
+        const RawContactData(name: '小号同事', phone: '660065'),
+        const RawContactData(name: '四位分机', phone: '8888'),
+        const RawContactData(name: '0开头', phone: '0123'), // 0 开头 → 非法
+        const RawContactData(name: '过长号码', phone: '1234567890123'), // 非法
+      ];
+
+      final items = ContactValidator.validate(
+        rawList: rawList,
+        existingPhones: {},
+        existingNames: {},
+        appendDeptTitleToName: false,
+      );
+
+      expect(items[0].status, ValidationStatus.valid);
+      expect(items[0].raw.phone, '660065');
+      expect(items[1].status, ValidationStatus.valid);
+      expect(items[2].status, ValidationStatus.skippedInvalidPhone);
+      expect(items[3].status, ValidationStatus.skippedInvalidPhone);
+    });
+
+    test('should dedupe short numbers within batch', () {
+      final rawList = [
+        const RawContactData(name: '云中台A', phone: '660065'),
+        const RawContactData(name: '云中台B', phone: '660065'),
+      ];
+
+      final items = ContactValidator.validate(
+        rawList: rawList,
+        existingPhones: {},
+        existingNames: {},
+        appendDeptTitleToName: false,
+      );
+
+      expect(items[0].status, ValidationStatus.valid);
+      expect(items[1].status, ValidationStatus.skippedDuplicatePhone);
     });
 
     test('should detect intra-batch duplicates', () {

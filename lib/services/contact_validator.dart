@@ -47,8 +47,8 @@ class ContactValidator {
         continue;
       }
 
-      // 3. 规则二：电话合法性校验（中国大陆 11 位有效手机号）
-      if (!_isValidMobile(cleanPhone)) {
+      // 3. 规则二：电话合法性校验（大陆手机号 或 公司内部小号）
+      if (!_isValidPhone(cleanPhone)) {
         results.add(ContactValidationItem(
           raw: raw,
           status: ValidationStatus.skippedInvalidPhone,
@@ -139,8 +139,9 @@ class ContactValidator {
     return p;
   }
 
-  /// 手机号合规判断
-  static bool _isValidMobile(String phone) {
-    return RegExp(r'^1[3-9]\d{9}$').hasMatch(phone);
+  /// 手机号合规判断：大陆手机号（1[3-9] 开头 11 位）或公司内部小号（3~8 位、非 0 开头，如 660065）
+  static bool _isValidPhone(String phone) {
+    if (RegExp(r'^1[3-9]\d{9}$').hasMatch(phone)) return true;
+    return RegExp(r'^[1-9]\d{2,7}$').hasMatch(phone);
   }
 }

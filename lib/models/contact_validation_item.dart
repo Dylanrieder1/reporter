@@ -11,7 +11,7 @@ enum ValidationStatus {
   /// 姓名在手机通讯录中已存在
   skippedDuplicateName,
 
-  /// 手机号不合法（非11位大陆号码）
+  /// 手机号不合法（既非大陆手机号也非公司小号）
   skippedInvalidPhone,
 
   /// 姓名为空

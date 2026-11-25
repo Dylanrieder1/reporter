@@ -82,6 +82,10 @@ class FlutterContactsProvider implements IContactsProvider {
     required String title,
   }) async {
     final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    // 手机号用 mobile 标签；公司小号（非11位）用 work 标签更贴合语义
+    final label = (cleanPhone.length == 11 && cleanPhone.startsWith('1'))
+        ? PhoneLabel.mobile
+        : PhoneLabel.work;
 
     Future<bool> doInsert(Contact contact) async {
       // insert() 成功时会返回携带系统分配 id 的 Contact，以此确认真实写入成功
@@ -94,7 +98,7 @@ class FlutterContactsProvider implements IContactsProvider {
 
     if (cleanPhone.isNotEmpty) {
       newContact.phones = [
-        Phone(cleanPhone, label: PhoneLabel.mobile),
+        Phone(cleanPhone, label: label),
       ];
     }
 
@@ -120,7 +124,7 @@ class FlutterContactsProvider implements IContactsProvider {
       fallbackContact.name.first = displayName;
       if (cleanPhone.isNotEmpty) {
         fallbackContact.phones = [
-          Phone(cleanPhone, label: PhoneLabel.mobile),
+          Phone(cleanPhone, label: label),
         ];
       }
       try {
